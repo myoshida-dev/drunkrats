@@ -1,0 +1,10 @@
+# Configuração local do Claude Code / editor
+.claude/
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Backups exportados do app (podem ter fotos pessoais)
+drunkrats-backup-*.json
