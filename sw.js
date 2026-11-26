@@ -1,6 +1,6 @@
 // Service worker: guarda os arquivos do app em cache pra funcionar offline.
 // Ao mudar qualquer arquivo, aumente a versão pra forçar a atualização.
-const CACHE = 'drunkrats-v4';
+const CACHE = 'drunkrats-v5';
 const FILES = [
   './',
   'index.html',

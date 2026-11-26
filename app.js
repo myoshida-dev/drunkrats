@@ -278,6 +278,61 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
 }
 
+/* ---------- Instalar no celular ---------- */
+
+const INSTALL_DISMISS_KEY = 'drunkrats.installDismissed';
+let installPrompt = null; // evento do Chrome/Edge/Android pra abrir a janela nativa de instalação
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); // guarda pra abrir quando a pessoa tocar no nosso botão
+  installPrompt = e;
+});
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  toast('📲 App instalado!');
+  render();
+});
+
+const isInstalled = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+function installBanner({ dismissible = true } = {}) {
+  if (isInstalled() || (dismissible && localStorage.getItem(INSTALL_DISMISS_KEY))) return '';
+  return `<div class="install">
+    <img src="icons/icon.svg" alt="">
+    <div class="who"><b>Instale o DrunkRats</b><small>Abre como app, em tela cheia</small></div>
+    <button class="primary" data-a="install">Instalar</button>
+    ${dismissible ? '<button class="x" data-a="dismissInstall" aria-label="Agora não">×</button>' : ''}
+  </div>`;
+}
+
+async function installApp() {
+  if (installPrompt) {
+    const e = installPrompt;
+    installPrompt = null; // o evento só pode ser usado uma vez
+    await e.prompt();
+    const { outcome } = await e.userChoice;
+    if (outcome !== 'accepted') toast('Instalação cancelada');
+    return;
+  }
+  // Sem a janela nativa (iPhone, ou navegador que não oferece): mostra o passo a passo.
+  const steps = isIOS()
+    ? `<h3>Instalar no iPhone</h3>
+       <ol class="steps">
+         <li>Abra este link no <b>Safari</b></li>
+         <li>Toque em <b>Compartilhar</b> (o quadrado com a seta pra cima)</li>
+         <li>Escolha <b>Adicionar à Tela de Início</b> e confirme</li>
+       </ol>`
+    : `<h3>Instalar no celular</h3>
+       <ol class="steps">
+         <li>Abra este link no <b>Chrome</b></li>
+         <li>Toque no menu <b>⋮</b> (canto de cima)</li>
+         <li>Escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b></li>
+       </ol>
+       <p>No computador: clique no ícone de instalar na barra de endereço.</p>`;
+  await openDialog(`<form method="dialog">${steps}<div class="row"><button value="ok" class="primary">Entendi</button></div></form>`, () => null);
+}
+
 /* ---------- Modais ---------- */
 
 const dlg = $('#dlg');
@@ -578,7 +633,8 @@ function viewOnboarding() {
       <button class="who-btn" data-a="beMe" data-v="${p.id}"><span>${p.avatar}</span>${esc(p.name)}</button>`).join('')}
     </div>
     <button class="ghost full" data-a="newMe">Sou novo por aqui</button>
-  </section>`;
+  </section>
+  ${installBanner({ dismissible: false })}`;
 }
 
 function viewHome() {
@@ -588,6 +644,7 @@ function viewHome() {
   const myPos = ranking.findIndex(r => r.p.id === meId);
   const mine = night && night.events.some(e => e.playerId === meId);
   return `
+    ${installBanner()}
     <div class="live">${liveLine()}</div>
     ${top && top.pts > 0 ? `<div class="leader">👑 Liderando: ${top.p.avatar} <b>${esc(top.p.name)}</b> · ${top.pts} pts${
       mine && top.p.id !== meId ? ` · você: ${ranking[myPos].pts} pts (${myPos + 1}º)` : ''}</div>` : ''}
@@ -822,6 +879,7 @@ function viewCrew() {
         </li>`).join('')}</ul>
       <p class="hint" style="margin:12px 0 0">Cada membro entra pelo próprio celular: escolhe o perfil ou toca em "Sou novo por aqui".</p>
     </section>
+    ${installBanner({ dismissible: false })}
     <section class="card">
       <h3>Backup</h3>
       <p class="hint">Os dados ficam só neste aparelho. Exporte pra guardar ou passar pra outro celular (as fotos vão junto).</p>
@@ -932,6 +990,12 @@ const handlers = {
   },
   rankMode(d) { ui.rankMode = d.v; render(); },
   moreFeed() { ui.feedLimit += 30; render(); },
+  install() { installApp(); },
+  dismissInstall() {
+    localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+    render();
+    toast('Dá pra instalar depois em Membros');
+  },
 
   /* Perfil deste aparelho */
   beMe(d) {
